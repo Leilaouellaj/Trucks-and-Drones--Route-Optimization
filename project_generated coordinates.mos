@@ -1,0 +1,389 @@
+model final_project
+
+uses "mmxprs"; !gain access to the Xpress-Optimizer solver
+
+uses "mmive" !gain access to graphical capabilities
+
+ 
+
+parameters
+
+LIMIT=22
+
+end-parameters
+
+setparam("XPRS_MAXTIME", 4800)
+
+ 
+
+ declarations
+
+P= 1..22
+
+graph : integer
+
+x: array(P) of real !declaring random X coordinates
+
+y: array(P) of real !declaring random Y coordinates
+
+Euc: array(P,P) of integer !declaring Euclidean matrix
+
+Truck_travel_bin: array(P,P) of mpvar !declaring truck binary variable
+
+Drones_travel_bin: array(P,P) of mpvar !declaring drones binary variable
+
+Primary_nodes: mpvar !primary nodes no
+
+Secondary_nodes: mpvar !secondary nodes no
+
+Positional: array(P) of mpvar
+
+end-declarations
+
+ 
+
+writeln("RANDOM numbers(", LIMIT," of them) between 1 and 20 :")
+
+setrandseed(7)
+
+cloud:=IVEaddplot("DISTRIBUTION OF GENERATED X and Y", IVE_BLUE)
+
+! forall(p in 2..LIMIT) do
+
+!  x(p):= 100*random
+
+  ! y(p):= 100*random
+
+!end-do
+
+   ! origin constraints
+
+  x(1):= 0
+
+  y(1):= 0
+
+  x(22):= 0
+
+  y(22):= 0
+
+!! Simulating a real example
+
+x(1) :=0
+
+x(2) :=20
+
+x(3) :=28
+
+x(4) :=18
+
+x(5) :=78
+
+x(6) :=62
+
+x(7) :=53
+
+x(8) :=63
+
+x(9) :=90
+
+x(10) :=64
+
+x(11) :=0
+
+x(12) :=10
+
+x(13) :=79
+
+x(14) :=23
+
+x(15) :=79
+
+x(16) :=85
+
+x(17) :=27
+
+x(18) :=33
+
+x(19) :=53
+
+x(20) :=83
+
+x(21) :=80
+
+x(22) :=0
+
+y(1) :=0
+
+y(2) :=30
+
+y(3) :=65
+
+y(4) :=5
+
+y(5) :=21
+
+y(6) :=84
+
+y(7) :=28
+
+y(8) :=71
+
+y(9) :=74
+
+y(10) :=48
+
+y(11) :=82
+
+y(12) :=21
+
+y(13) :=59
+
+y(14) :=100
+
+y(15) :=98
+
+y(16) :=21
+
+y(17) :=2
+
+y(18) :=96
+
+y(19) :=94
+
+y(20) :=0
+
+y(21) :=25
+
+y(22) :=0
+
+ 
+
+ 
+
+!type_constraints
+
+forall( p in 1..LIMIT) do
+
+Positional(p) is_integer
+
+end-do
+
+ !K drones allowed constraints
+
+ forall(i in 2..21) sum(j in 1..LIMIT) Truck_travel_bin(i,j) + sum(j in 1..LIMIT) Drones_travel_bin(i,j)  <= 3
+
+ !Positional Constraints
+
+Positional(1) = 1
+
+Positional(22) = sum(i in 1..LIMIT, j in 1..LIMIT) Truck_travel_bin(i,j)+1
+
+ forall( i in 1..LIMIT, j in 1..LIMIT)
+
+Positional(j) >= Positional(i) + 1 - 200*(1-Truck_travel_bin(i,j))
+
+ !Balance constraint out - in = 0
+
+forall(i in 2..21) sum(j in 1..LIMIT) Truck_travel_bin(i,j)-sum(j in 1..LIMIT) Truck_travel_bin(j,i)=0
+
+ forall(p in 1..LIMIT,j in 1..LIMIT) do
+
+   Truck_travel_bin(p,j) is_binary
+
+   Drones_travel_bin(p,j) is_binary
+
+end-do
+
+ Primary_nodes is_integer
+
+Secondary_nodes is_integer
+
+Primary_nodes >=0
+
+Secondary_nodes >=0
+
+  forall(p in 1..LIMIT,j in 1..LIMIT) do
+
+     Euc(p,j):= round(sqrt((y(j)-y(p))^2 + (x(j)-x(p))^2))
+
+  end-do
+
+ !Limit constraints
+
+ Primary_nodes + Secondary_nodes =22
+
+ !Primary_nodes=(Secondary_nodes/2)+2
+
+ !Primary_nodes*2=Secondary_nodes
+
+ sum(i in 1..LIMIT, j in 1..LIMIT) Drones_travel_bin(i,j) = 2*Secondary_nodes
+
+ sum(i in 1..LIMIT, j in 1..LIMIT) Truck_travel_bin(i,j) = Primary_nodes -1
+
+ ! constraint for removing subtours of drones
+
+forall(i in 2..21, j in 2..21)
+
+                Drones_travel_bin(i,j) = Drones_travel_bin(j,i)
+
+               
+
+!Constraint for removing subtour of trucks
+
+forall(i in 2..21, j in 2..21)
+
+                Truck_travel_bin(i,j) + Truck_travel_bin(j,i) <=1
+
+               
+
+!Equivalence of existence of S(ji) and summation p(ij)
+
+ !forall(a in 1..12, b in 1..12) 2*Drones_travel_bin(a,b) <= sum(i in 1..11,j in 1..12)Truck_travel_bin(i,j) + sum(i in 1..12,j in 1..12)Truck_travel_bin(i,j)
+
+ 
+
+forall (i in 2..21, j in 2..21) Drones_travel_bin(i,j) <= sum(a in 1..22) Truck_travel_bin(a,i)+ sum(a in 1..22) Truck_travel_bin(a,j)
+
+!if S(i,j) exists no S(j,i) should exist
+
+!forall(i in 2..11) sum(j in 2..11) Drones_travel_bin(j,i) + sum(j in 2..11) Drones_travel_bin(i,j)>= 2- sum(j in 2..11)Truck_travel_bin(i,j)
+
+ 
+
+! CONSTRAINT FOR Kth
+
+ 
+
+ 
+
+! origin constraints - part 2
+
+sum(i in 1..LIMIT) Truck_travel_bin(1,i)= 1
+
+sum(i in 1..LIMIT) Drones_travel_bin(1,i)= 0
+
+ sum(i in 1..LIMIT) Truck_travel_bin(i,1)= 0
+
+ sum(i in 1..LIMIT) Drones_travel_bin(i,1)= 0
+
+ 
+
+ !last node constraints
+
+sum(i in 1..LIMIT) Truck_travel_bin(22,i)= 0
+
+sum(i in 1..LIMIT) Drones_travel_bin(22,i)= 0
+
+ sum(i in 1..LIMIT) Truck_travel_bin(i,22)= 1
+
+sum(i in 1..LIMIT) Drones_travel_bin(i,22)= 0
+
+ Truck_travel_bin(1,22) =0
+
+Truck_travel_bin(22,1) =0
+
+ 
+
+ !removing_arcs_on_itself
+
+sum(i in 1..LIMIT) Truck_travel_bin(i,i) = 0
+
+sum(i in 1..LIMIT) Drones_travel_bin(i,i) = 0
+
+ !all nodes should be have incoming nodes - except origin
+
+forall(i in 2..LIMIT) sum(j in 1..LIMIT) Truck_travel_bin(j,i) + sum(j in 1..LIMIT) Drones_travel_bin(j,i) >=1
+
+  
+
+ !all nodes should have outgoing nodes - except destination
+
+  forall(j in 1..21) sum(i in 1..LIMIT) Truck_travel_bin(j,i) + sum(i in 1..LIMIT) Drones_travel_bin(j,i) >=1
+
+  
+
+ ! constraint for not being secondary and primary at the same time
+
+forall(i in 1..LIMIT, j in 1..LIMIT)
+
+                Truck_travel_bin(i,j) + Drones_travel_bin(i,j) <=1
+
+ 
+
+! constraint for traveling back to j if drone travels from j
+
+forall(i in 2..21, j in 2..21)
+
+                Drones_travel_bin(i,j) = Drones_travel_bin(j,i)
+
+ 
+
+ 
+
+obj:=sum(i in P)sum(j in P)(Truck_travel_bin(i,j))*Euc(i,j)*10+sum(i in P)sum(j in P)(Drones_travel_bin(i,j))*Euc(i,j)*3
+
+minimize(obj)
+
+ 
+
+ 
+
+writeln("Printing random numbers generated below:")
+
+forall(p in 1..LIMIT) do
+
+writeln("Number ",p," in Array X is :",x(p)," and the Number ",p," in Array  Y is:", y(p))
+
+end-do
+
+ 
+
+ IVEzoom(0, -0, 10, 10)
+
+writeln(" Generating the Plot for co-ordinates below")
+
+graph:=IVEaddplot("Y(X)",IVE_RED)                        !Create a graph
+
+graph2:=IVEaddplot("Y(X)",IVE_GREEN)
+
+ forall(p in 1..LIMIT) do
+
+IVEdrawpoint(graph, x(p), y(p))
+
+IVEdrawlabel(graph, x(p), y(p), ""+p)
+
+end-do
+
+ 
+
+forall(i in 1..LIMIT,j in 1..LIMIT |getsol(Drones_travel_bin(i,j)) > 0) do
+
+IVEdrawline(graph2, x(i), y(i),x(j), y(j))
+
+end-do
+
+  forall(i in 1..LIMIT,j in 1..LIMIT |getsol(Truck_travel_bin(i,j)) > 0) do
+
+IVEdrawline(graph, x(i), y(i),x(j), y(j))
+
+end-do
+
+ 
+
+forall(i in 1..LIMIT,j in 1..LIMIT |getsol(Truck_travel_bin(i,j)) > 0 ) do
+
+                writeln("Send Truck from ",i," to ", j," : ",getsol(Truck_travel_bin(i,j)))
+
+end-do
+
+ 
+
+forall(i in 1..LIMIT,j in 1..LIMIT |getsol(Drones_travel_bin(i,j)) > 0 ) do
+
+                writeln("Send Drones from ",i," to ", j," : ",getsol(Drones_travel_bin(i,j)))
+
+                end-do
+
+ 
+
+end-model
